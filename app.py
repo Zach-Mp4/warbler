@@ -1,10 +1,11 @@
+from operator import or_
 import os
 
 from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 import pdb
-from forms import UserAddForm, LoginForm, MessageForm
+from forms import UserAddForm, LoginForm, MessageForm, UserEditForm
 from models import db, connect_db, User, Message
 
 CURR_USER_KEY = "curr_user"
@@ -21,7 +22,6 @@ app.config['SQLALCHEMY_ECHO'] = False
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', "it's a secret")
 toolbar = DebugToolbarExtension(app)
-
 connect_db(app)
 
 
@@ -215,6 +215,34 @@ def profile():
     """Update profile for current user."""
 
     # IMPLEMENT THIS
+    if not g.user:
+        flash('please login', "danger")
+        return redirect('/login')
+    
+    user = User.query.get_or_404(session[CURR_USER_KEY])
+    form = UserEditForm(obj = user)
+
+    if form.validate_on_submit():
+        password = form.password.data
+        user = User.authenticate(username = user.username, password = password)
+        if user:
+            user.username = form.username.data
+            user.email = form.email.data
+            user.image_url = form.image_url.data
+            user.header_image_url = form.header_image_url.data
+            user.bio = form.bio.data
+
+            db.session.add(user)
+            db.session.commit()
+
+            return redirect(f'/users/{user.id}')
+        
+        flash("Invalid credentials.", 'danger')
+        return redirect('/')
+
+        
+
+    return render_template('/users/edit.html', form = form)
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -297,6 +325,11 @@ def homepage():
     if g.user:
         messages = (Message
                     .query
+                    .join(User)
+                    .filter(or_(
+                        User.id.in_(user.id for user in g.user.following),
+                        User.id == g.user.id
+                        ))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
