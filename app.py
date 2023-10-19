@@ -1,4 +1,4 @@
-from operator import or_
+from operator import and_, or_
 import os
 
 from flask import Flask, render_template, request, flash, redirect, session, g
@@ -6,7 +6,7 @@ from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 import pdb
 from forms import UserAddForm, LoginForm, MessageForm, UserEditForm
-from models import db, connect_db, User, Message
+from models import db, connect_db, User, Message, Likes
 
 CURR_USER_KEY = "curr_user"
 
@@ -333,11 +333,45 @@ def homepage():
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
+        likes = [like.id for like in g.user.likes]
 
-        return render_template('home.html', messages=messages)
+        return render_template('home.html', messages=messages, likes = likes)
 
     else:
         return render_template('home-anon.html')
+    
+##############################################################################
+#like routes
+@app.route('/users/add_like/<messageid>', methods=['POST'])
+def like_handler(messageid):
+    if not g.user:
+        flash('please login', 'danger')
+        return redirect('/login')
+    
+    url = '/'
+    if '/likes' in request.headers.get('Referer') and '/users' in request.headers.get('Referer'):
+        url = request.headers.get('Referer')
+
+    user = User.query.get_or_404(g.user.id)
+
+    likes =  Likes.query.filter(and_(Likes.user_id == user.id, Likes.message_id == messageid)).first()
+    if likes:
+        Likes.query.filter(and_(Likes.user_id == user.id, Likes.message_id == messageid)).delete()
+        db.session.commit()
+        return redirect(url)
+    
+    like = Likes(user_id = user.id, message_id = messageid)
+    db.session.add(like)
+    db.session.commit()
+    return redirect(url)
+
+
+@app.route('/users/<userid>/likes')
+def likes(userid):
+    user = User.query.get_or_404(userid)
+    likes = [like.id for like in g.user.likes]
+    return render_template('/users/likes.html', messages = user.likes, user = user, likes = likes)
+
 
 
 ##############################################################################

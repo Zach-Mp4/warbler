@@ -42,7 +42,7 @@
       <ul class="list-group" id="messages">
         {% for msg in messages %}
           <li class="list-group-item">
-            <a href="/messages/{{ msg.id  }}" class="message-link"/>
+            <a href="/messages/{{ msg.id  }}" class="message-link">
             <a href="/users/{{ msg.user.id }}">
               <img src="{{ msg.user.image_url }}" alt="" class="timeline-image">
             </a>
@@ -57,7 +57,7 @@
                 btn-sm 
                 {{'btn-primary' if msg.id in likes else 'btn-secondary'}}"
               >
-                <i class="fa fa-thumbs-up"></i> 
+                <i class="fa fa-thumbs-up" type="submit"></i>
               </button>
             </form>
           </li>
