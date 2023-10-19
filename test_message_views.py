@@ -2,12 +2,12 @@
 
 # run these tests like:
 #
-#    FLASK_ENV=production python -m unittest test_message_views.py
+#    FLASK_ENV=production python -m unittest -q test_message_views.py
 
 
 import os
 from unittest import TestCase
-
+from sqlalchemy.orm.exc import NoResultFound
 from models import db, connect_db, Message, User
 
 # BEFORE we import our app, let's set an environmental variable
@@ -25,7 +25,8 @@ from app import app, CURR_USER_KEY
 # Create our tables (we do this here, so we only create the tables
 # once for all tests --- in each test, we'll delete the data
 # and create fresh new clean test data
-
+ctx = app.app_context()
+ctx.push()
 db.create_all()
 
 # Don't have WTForms use CSRF at all, since it's a pain to test
@@ -71,3 +72,40 @@ class MessageViewTestCase(TestCase):
 
             msg = Message.query.one()
             self.assertEqual(msg.text, "Hello")
+
+    def test_view_message(self):
+        """test the message viewing page"""
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+            
+            c.post("/messages/new", data={"text": "Hello"})
+
+            msg = Message.query.one()
+
+            resp = c.get(f'/messages/{msg.id}')
+
+            self.assertEqual(resp.status_code, 200)
+
+            html = resp.get_data(as_text=True)
+
+            self.assertIn("Hello", html)
+
+    def test_delete_message(self):
+        """test deleting a message"""
+
+        with self.client as c:
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+            
+            c.post("/messages/new", data={"text": "Hello"})
+
+            msg = Message.query.one()
+
+            resp = c.post(f'/messages/{msg.id}/delete')
+
+            self.assertEqual(resp.status_code, 302)
+
+            with self.assertRaises(NoResultFound):
+                Message.query.one()
+
