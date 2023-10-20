@@ -389,3 +389,9 @@ def add_header(req):
     req.headers["Expires"] = "0"
     req.headers['Cache-Control'] = 'public, max-age=0'
     return req
+
+###########
+#404 handler
+@app.errorhandler(404) 
+def not_found(e): 
+  return render_template("404.html") 
